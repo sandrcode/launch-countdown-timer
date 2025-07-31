@@ -66,8 +66,7 @@ h2 {
 }
 
 footer {
-  background-image: url(../assets/images/pattern-hills.svg) no-repeat center top /
-    cover;
+  background: url(../assets/images/pattern-hills.svg) no-repeat center top / cover;
   height: 200px;
   display: flex;
   justify-content: center;
