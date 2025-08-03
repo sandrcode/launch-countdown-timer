@@ -1,4 +1,4 @@
-const endDate = "2025-08-02T11:11:00";
+const endDate = "2025-10-01T00:00:00";
 
 function getCountdownElements(element) {
   const card = element.querySelector(".card");
