@@ -1,50 +1,72 @@
-const endDate = "2025-10-01T00:00:00";
+const endDate = "2025-10-21T13:00:00";
+let countdownTimer = null;
+const timeUnits = ["days", "hours", "minutes", "seconds"];
+const cardElementsCache = new Map();
 
 function getCountdownElements(element) {
-  const card = element.querySelector(".card");
-  const cardTop = card.querySelector(".top-half");
-  const cardBottom = card.querySelector(".bottom-half");
-  const cardOverlay = card.querySelector(".card-overlay");
-  const cardTopOverlay = cardOverlay.querySelector(".top-half-overlay");
-  const cardBottomOverlay = cardOverlay.querySelector(".bottom-half-overlay");
+  if (cardElementsCache.has(element)) {
+    return cardElementsCache.get(element);
+  }
 
-  return {
-    cardTop,
-    cardBottom,
-    cardOverlay,
-    cardTopOverlay,
-    cardBottomOverlay,
+  const card = element.querySelector(".card");
+  const elements = {
+    cardTop: card.querySelector(".top-half"),
+    cardBottom: card.querySelector(".bottom-half"),
+    cardOverlay: card.querySelector(".card-overlay"),
+    cardTopOverlay: card.querySelector(".top-half-overlay"),
+    cardBottomOverlay: card.querySelector(".bottom-half-overlay"),
   };
+
+  // Cache the elements
+  cardElementsCache.set(element, elements);
+  return elements;
 }
 
 function updateCardValues(element, overlay, timeValue) {
-  element.textContent = timeValue;
-  overlay.textContent = timeValue;
+  // Format with leading zero (2 digits)
+  const formattedValue = timeValue.toString().padStart(2, "0");
+
+  // Only update if value changed to avoid unnecessary DOM operations
+  if (element.textContent !== formattedValue) {
+    element.textContent = formattedValue;
+    overlay.textContent = formattedValue;
+  }
 }
 
-function updateTimeCard(element, timeValue) {
-    const countdownElement = document.querySelector(`.${element}`)
-    const cardElements = getCountdownElements(countdownElement);
+function updateTimeCard(elementClass, timeValue) {
+  const countdownElement = document.querySelector(`.${elementClass}`);
+  if (!countdownElement) return;
 
-  //add animation "flip" class
-  if (parseInt(cardElements.cardTop.textContent, 10) === timeValue) {
-    return;
-  }
+  const cardElements = getCountdownElements(countdownElement);
+  const currentValue = parseInt(cardElements.cardTop.textContent, 10);
+
+  // Skip if value hasn't changed
+  if (currentValue === timeValue) return;
+
+  // Add flip animation
   cardElements.cardOverlay.classList.add("flip");
 
+  // Update visible values
   updateCardValues(
     cardElements.cardTop,
     cardElements.cardBottomOverlay,
     timeValue
   );
 
-  function endAnimation() {
+  // Clean up animation and update remaining values when animation ends
+  const endAnimation = () => {
     cardElements.cardOverlay.classList.remove("flip");
-    updateCardValues(cardElements.cardBottom, cardElements.cardTopOverlay, timeValue);
-    this.removeEventListener("animationend", endAnimation);
-  }
+    updateCardValues(
+      cardElements.cardBottom,
+      cardElements.cardTopOverlay,
+      timeValue
+    );
+    cardElements.cardOverlay.removeEventListener("animationend", endAnimation);
+  };
 
-  cardElements.cardOverlay.addEventListener("animationend", endAnimation);
+  cardElements.cardOverlay.addEventListener("animationend", endAnimation, {
+    once: true,
+  });
 }
 
 function getRemainingTime(endTime) {
@@ -52,38 +74,52 @@ function getRemainingTime(endTime) {
   const timeDistance = Math.floor(endTime - currentTime);
 
   if (timeDistance <= 0) {
-    return {
-      days: 0,
-      hours: 0,
-      minutes: 0,
-      seconds: 0,
-    };
+    return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   }
 
   const totalSeconds = Math.floor(timeDistance / 1000);
-  const days = Math.floor(totalSeconds / (3600 * 24));
-  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+  const days = Math.floor(totalSeconds / 86400); // 3600 * 24
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  return {
-    days,
-    hours,
-    minutes,
-    seconds,
-  };
+  return { days, hours, minutes, seconds };
 }
 
 function updateAllCards() {
-    const endTimeStamp = new Date(endDate).getTime();
-    const remainingTimeBits = getRemainingTime(endTimeStamp);
+  const endTimeStamp = new Date(endDate).getTime();
+  const remainingTime = getRemainingTime(endTimeStamp);
 
-    updateTimeCard('seconds', remainingTimeBits.seconds);
-    updateTimeCard('minutes', remainingTimeBits.minutes);
-    updateTimeCard('hours', remainingTimeBits.hours);
-    updateTimeCard('days', remainingTimeBits.days);
+  // Check if countdown has reached zero
+  const { days, hours, minutes, seconds } = remainingTime;
+
+  if (days === 0 && hours === 0 && minutes === 0 && seconds === 0) {
+    // Force final state (0, 0, 0, 0)
+    timeUnits.forEach((unit) => {
+      updateTimeCard(unit, 0);
+    });
+
+    if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+
+    return;
+  }
+
+  // Update all time unit cards
+  timeUnits.forEach((unit) => {
+    updateTimeCard(unit, remainingTime[unit]);
+  });
 }
 
-const countdownTimer = setInterval(() => {
-    updateAllCards();
-}, 1000);
+// Initialize immediately to avoid initial delay
+updateAllCards();
+
+// Start the countdown timer
+countdownTimer = setInterval(updateAllCards, 1000);
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  clearInterval(countdownTimer);
+});
